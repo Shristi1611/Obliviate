@@ -1,0 +1,32 @@
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python & Bytecode Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Datasets & Heavy Raw Files
+sepsis_raw/
+*.npz
+*.csv
+*.psv
+
+# Saved Model Checkpoints & Compressed Models
+checkpoints/
+*.zip
+*.pth
+*.pt
+
+# Local Databases
+*.db
+obliviate.db
+
+# IDE & Editor Settings
+.vscode/
+.idea/
+.DS_Store

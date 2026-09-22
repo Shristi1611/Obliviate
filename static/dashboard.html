@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Obliviate — Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Questrial&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#000;
+    --bg:#F6EAF2;
+    --hairline:rgba(0,0,0,.55);
+    --hairline-soft:rgba(0,0,0,.18);
+    --glass:rgba(255,255,255,.4);
+    --glass-soft:rgba(255,255,255,.22);
+    --text-dim:rgba(0,0,0,.58);
+    --accent:#28644E;      /* deep muted teal — "clean / trained" state */
+    --accent-dim:rgba(40,100,78,.10);
+    --danger:#7C2F42;      /* deep plum-brick — "deleted / forgotten" state */
+    --danger-dim:rgba(124,47,66,.10);
+    --update:#8A5A17;      /* muted amber — "changed" state */
+    --update-dim:rgba(138,90,23,.10);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Questrial',system-ui,-apple-system,'Segoe UI',sans-serif;
+    font-weight:400;
+    min-height:100vh;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  :focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  code,.mono{font-family:'JetBrains Mono',monospace}
+
+  /* ---------- Header ---------- */
+  header{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:24px;
+    padding:32px 40px;
+    border-bottom:1.4px solid var(--hairline);
+    flex-wrap:wrap;
+  }
+  .back-link{
+    font-size:13px;
+    color:var(--ink);
+    text-decoration:none;
+    letter-spacing:.02em;
+    opacity:.7;
+    transition:opacity .2s ease;
+  }
+  .back-link:hover{opacity:1}
+  header h1{
+    font-size:26px;
+    font-weight:400;
+    letter-spacing:-0.01em;
+    margin-top:10px;
+  }
+  header p{
+    color:var(--text-dim);
+    font-size:13.5px;
+    margin-top:4px;
+    max-width:46ch;
+  }
+  .accuracy-pill{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-size:13px;
+    color:var(--text-dim);
+    height:38px;
+    padding:0 20px;
+    border:1.2px solid var(--hairline);
+    border-radius:19px;
+    background:var(--glass);
+    backdrop-filter:blur(6px);
+    -webkit-backdrop-filter:blur(6px);
+    white-space:nowrap;
+  }
+  .accuracy-pill .value{
+    font-family:'JetBrains Mono',monospace;
+    font-size:16px;
+    color:var(--accent);
+    font-weight:500;
+  }
+
+  /* ---------- Layout ---------- */
+  .layout{
+    display:grid;
+    grid-template-columns:340px 1fr;
+    min-height:calc(100vh - 118px);
+  }
+  @media (max-width:900px){
+    .layout{grid-template-columns:1fr}
+  }
+
+  /* ---------- Shard map (left rail) ---------- */
+  .shardmap{
+    border-right:1.4px solid var(--hairline);
+    padding:28px 24px;
+    overflow-y:auto;
+  }
+  .shardmap h2{
+    font-size:12.5px;
+    color:var(--text-dim);
+    font-weight:400;
+    margin-bottom:18px;
+    letter-spacing:.03em;
+  }
+  .shard-block{
+    border:1.2px solid var(--hairline-soft);
+    border-radius:14px;
+    margin-bottom:14px;
+    overflow:hidden;
+    background:var(--glass-soft);
+    backdrop-filter:blur(6px);
+    -webkit-backdrop-filter:blur(6px);
+    transition:border-color .3s ease, background .3s ease;
+  }
+  .shard-block.affected{
+    border-color:var(--danger);
+    background:var(--danger-dim);
+  }
+  .shard-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:12px 16px;
+    font-size:13.5px;
+    border-bottom:1px solid var(--hairline-soft);
+  }
+  .shard-head .count{
+    color:var(--text-dim);
+    font-family:'JetBrains Mono',monospace;
+    font-size:11.5px;
+  }
+  .slice-row{
+    display:flex;
+    gap:5px;
+    padding:12px 14px;
+  }
+  .slice-cell{
+    flex:1;
+    height:28px;
+    border-radius:14px;
+    background:transparent;
+    border:1px solid var(--hairline-soft);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:10.5px;
+    color:var(--text-dim);
+    font-family:'JetBrains Mono',monospace;
+    transition:all .4s ease;
+    position:relative;
+    overflow:hidden;
+  }
+  .slice-cell.retrained{
+    background:var(--accent-dim);
+    border-color:var(--accent);
+    color:var(--accent);
+  }
+  .slice-cell.dissolving{
+    animation:dissolve 1.1s ease forwards;
+  }
+  @keyframes dissolve{
+    0%{opacity:1; filter:blur(0px)}
+    50%{opacity:.35; filter:blur(3px); background:var(--danger-dim); border-color:var(--danger)}
+    100%{opacity:1; filter:blur(0px); background:var(--accent-dim); border-color:var(--accent); color:var(--accent)}
+  }
+
+  /* ---------- Main panel ---------- */
+  main{padding:0}
+  .tabs{
+    display:flex;
+    gap:32px;
+    padding:0 32px;
+    border-bottom:1.4px solid var(--hairline);
+    overflow-x:auto;
+  }
+  .tab{
+    padding:18px 0;
+    font-size:14px;
+    color:var(--text-dim);
+    cursor:pointer;
+    border-bottom:2px solid transparent;
+    transition:color .2s ease, border-color .2s ease;
+    background:none;
+    border-top:none;
+    border-left:none;
+    border-right:none;
+    font-family:'Questrial',sans-serif;
+    white-space:nowrap;
+  }
+  .tab:hover{color:var(--ink)}
+  .tab.active{color:var(--ink); border-bottom-color:var(--ink)}
+
+  .panel{padding:32px}
+  .panel.hidden{display:none}
+
+  .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+  @media (max-width:600px){.grid-2{grid-template-columns:1fr}}
+  .card{
+    border:1.2px solid var(--hairline-soft);
+    border-radius:16px;
+    padding:22px;
+    background:var(--glass-soft);
+    backdrop-filter:blur(6px);
+    -webkit-backdrop-filter:blur(6px);
+  }
+  .card h3{font-size:12.5px; color:var(--text-dim); font-weight:400; margin-bottom:10px; letter-spacing:.02em}
+  .card .big{font-family:'JetBrains Mono',monospace; font-size:30px; color:var(--accent); font-weight:500}
+
+  table{width:100%; border-collapse:collapse; font-size:13px}
+  th{
+    text-align:left;
+    color:var(--text-dim);
+    font-weight:400;
+    padding:10px 12px;
+    border-bottom:1.2px solid var(--hairline);
+    font-size:12px;
+  }
+  td{
+    padding:10px 12px;
+    border-bottom:1px solid var(--hairline-soft);
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+  }
+  tr:hover td{background:var(--glass-soft)}
+
+  .form-row{display:flex; gap:12px; align-items:end; flex-wrap:wrap; margin-bottom:20px}
+  .field label{display:block; font-size:12px; color:var(--text-dim); margin-bottom:6px}
+  select,input{
+    background:var(--glass);
+    border:1.2px solid var(--hairline);
+    color:var(--ink);
+    padding:9px 14px;
+    border-radius:18px;
+    font-family:'Questrial',sans-serif;
+    font-size:13px;
+  }
+  button.action{
+    background:var(--ink);
+    color:var(--bg);
+    border:none;
+    padding:10px 22px;
+    border-radius:18px;
+    font-weight:400;
+    font-size:13px;
+    cursor:pointer;
+    font-family:'Questrial',sans-serif;
+    transition:opacity .2s ease;
+  }
+  button.action:hover{opacity:.78}
+  button.action.danger{background:var(--danger); color:#fff}
+  button.action:disabled{opacity:.4; cursor:not-allowed}
+
+  .init-screen{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    height:100vh; gap:20px; text-align:center; padding:0 24px;
+  }
+  .init-screen h2{font-size:26px; font-weight:400}
+  .init-screen p{color:var(--text-dim); font-size:14px; max-width:420px}
+
+  .unlearn-result{
+    margin-top:20px;
+    padding:22px;
+    border:1.2px solid var(--accent);
+    border-radius:16px;
+    background:var(--accent-dim);
+  }
+  .unlearn-result .stats{display:flex; gap:32px; margin-top:12px}
+
+  .compare-grid{
+    display:grid; grid-template-columns:1fr 1fr; gap:16px;
+    margin-top:18px;
+  }
+  @media (max-width:600px){.compare-grid{grid-template-columns:1fr}}
+  .compare-col{
+    border:1.2px solid var(--hairline-soft);
+    border-radius:14px;
+    padding:16px;
+    background:var(--glass);
+  }
+  .compare-col h4{
+    font-size:12px; color:var(--text-dim); font-weight:400;
+    margin-bottom:12px; letter-spacing:.03em;
+  }
+  .compare-col.sisa{border-color:var(--accent)}
+  .compare-row{
+    display:flex; justify-content:space-between; align-items:baseline;
+    padding:6px 0; font-size:13px; color:var(--text-dim);
+  }
+  .compare-row strong{
+    font-family:'JetBrains Mono',monospace; color:var(--ink); font-size:14px; font-weight:500;
+  }
+  .speedup-banner{
+    margin-top:16px;
+    padding:14px 18px;
+    background:var(--accent-dim);
+    border:1.2px solid var(--accent);
+    border-radius:14px;
+    font-size:14px;
+    color:var(--ink);
+  }
+  .speedup-banner strong{color:var(--accent); font-family:'JetBrains Mono',monospace}
+
+  .op-badge{
+    display:inline-block; padding:2px 12px; border-radius:10px;
+    font-size:11px; letter-spacing:.02em;
+    border:1px solid var(--hairline-soft);
+  }
+  .op-badge.op-insert{color:var(--accent); border-color:var(--accent)}
+  .op-badge.op-update{color:var(--update); border-color:var(--update)}
+  .op-badge.op-delete{color:var(--danger); border-color:var(--danger)}
+  .unlearn-result .stat-label{font-size:11px; color:var(--text-dim)}
+  .unlearn-result .stat-value{font-family:'JetBrains Mono',monospace; font-size:20px; color:var(--accent)}
+
+  .hint{color:var(--text-dim); font-size:12px; margin-top:6px}
+  .hint a{color:var(--danger)}
+  .empty{color:var(--text-dim); font-size:13px; padding:20px 0}
+</style>
+</head>
+<body>
+
+<div id="init-screen" class="init-screen">
+  <h2>Obliviate</h2>
+  <p>A database-backed ML system where deletion means real, verifiable forgetting.</p>
+  <p class="hint">First-time setup seeds the database and trains every shard: this can take a while. After that, restarting the server resumes instantly without retraining.</p>
+  <button class="action" onclick="initSystem(false)">Initialize database</button>
+  <p class="hint" id="init-status"></p>
+</div>
+
+<div id="app" style="display:none;">
+  <header>
+    <div>
+      <a href="/" class="back-link">&larr; Obliviate</a>
+      <h1>Live dashboard</h1>
+      <p>Sharded, isolated, sliced, aggregated: machine unlearning with a full audit trail</p>
+    </div>
+    <div class="accuracy-pill">
+      <span>aggregated accuracy</span>
+      <span class="value" id="header-accuracy">—</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <div class="shardmap">
+      <h2>SHARD STRUCTURE</h2>
+      <div id="shard-map-container"></div>
+    </div>
+
+    <main>
+      <div class="tabs">
+        <button class="tab active" data-tab="overview">Overview</button>
+        <button class="tab" data-tab="records">Records</button>
+        <button class="tab" data-tab="insert">Insert</button>
+        <button class="tab" data-tab="update">Update</button>
+        <button class="tab" data-tab="unlearn">Delete &amp; Unlearn</button>
+        <button class="tab" data-tab="audit">Audit Log</button>
+      </div>
+
+      <div class="panel" id="panel-overview">
+        <div class="grid-2">
+          <div class="card">
+            <h3>Aggregated accuracy</h3>
+            <div class="big" id="ov-accuracy">—</div>
+          </div>
+          <div class="card">
+            <h3>Total active records</h3>
+            <div class="big" id="ov-total">—</div>
+          </div>
+        </div>
+        <p class="hint" style="margin-top:20px;">
+          The server automatically resumes from existing trained models on restart, no retraining needed.
+          <a href="#" onclick="if(confirm('This wipes the database and retrains every shard from scratch. Continue?')){ initSystem(true); } return false;">Reset &amp; retrain from scratch</a> if you need a clean slate.
+        </p>
+      </div>
+
+      <div class="panel hidden" id="panel-records">
+        <div class="form-row">
+          <div class="field">
+            <label>Filter by shard</label>
+            <select id="records-shard-filter" onchange="loadRecords()">
+              <option value="">All shards</option>
+            </select>
+          </div>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>Shard</th><th>Slice</th><th>Label</th><th>Deleted</th></tr></thead>
+          <tbody id="records-body"></tbody>
+        </table>
+      </div>
+
+      <div class="panel hidden" id="panel-insert">
+        <div class="form-row">
+          <div class="field">
+            <label>Shard</label>
+            <select id="insert-shard"></select>
+          </div>
+          <div class="field">
+            <label>Slice</label>
+            <select id="insert-slice"></select>
+          </div>
+          <div class="field">
+            <label>Label</label>
+            <select id="insert-label"><option value="0">0</option><option value="1">1</option></select>
+          </div>
+          <button class="action" onclick="insertRecord()">Insert &amp; retrain affected slice</button>
+        </div>
+        <p class="hint" id="insert-status"></p>
+        <div id="insert-result-container"></div>
+      </div>
+
+      <div class="panel hidden" id="panel-update">
+        <div class="form-row">
+          <div class="field">
+            <label>Record ID</label>
+            <select id="update-record"></select>
+          </div>
+          <div class="field">
+            <label>New label</label>
+            <select id="update-label"><option value="0">0</option><option value="1">1</option></select>
+          </div>
+          <button class="action" onclick="updateRecord()">Update &amp; retrain affected slice</button>
+        </div>
+        <p class="hint" id="update-status"></p>
+        <div id="update-result-container"></div>
+      </div>
+
+      <div class="panel hidden" id="panel-unlearn">
+        <div class="form-row">
+          <div class="field">
+            <label>Record to delete</label>
+            <select id="unlearn-record"></select>
+          </div>
+          <button class="action danger" onclick="unlearnRecord()">Delete &amp; unlearn</button>
+          <button class="action" onclick="runBaseline()">Run full retrain baseline</button>
+        </div>
+        <div id="unlearn-result-container"></div>
+      </div>
+
+      <div class="panel hidden" id="panel-audit">
+        <table>
+          <thead><tr><th>Operation</th><th>Record</th><th>Shard</th><th>Rolled back to</th><th>Retrained slices</th><th>Acc before</th><th>Acc after</th><th>Time (s)</th></tr></thead>
+          <tbody id="audit-body"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+const API = "";
+let NUM_SHARDS = 4, NUM_SLICES = 4;
+let lastOpResult = null;   // {type, shard_id, duration_seconds, accuracy_after, ...} from insert/update/delete
+
+async function checkStatusOnLoad(){
+  try{
+    const resp = await fetch(API + "/api/status");
+    const data = await resp.json();
+    if(data.ready){
+      document.getElementById('init-screen').style.display = "none";
+      document.getElementById('app').style.display = "block";
+      try{ await refreshAll(); }catch(e){ console.error("refreshAll failed:", e); }
+      applyHashTab();
+    }
+  }catch(e){ /* backend not reachable yet; leave init screen showing */ }
+}
+checkStatusOnLoad();
+
+async function initSystem(force){
+  document.getElementById('init-status').textContent = force
+    ? "Wiping and retraining everything from scratch..."
+    : "Checking for existing trained models...";
+  const resp = await fetch(API + "/api/init", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({force: !!force})});
+  const data = await resp.json();
+  if(data.status === "ok"){
+    document.getElementById('init-screen').style.display = "none";
+    document.getElementById('app').style.display = "block";
+    try{ await refreshAll(); }catch(e){ console.error("refreshAll failed:", e); }
+    applyHashTab();
+    if(data.resumed){
+      console.log("Resumed from existing trained models — no retraining needed.");
+    }
+  } else {
+    document.getElementById('init-status').textContent = "Error: " + data.message;
+  }
+}
+
+function activateTab(name){
+  const tab = document.querySelector(`.tab[data-tab="${name}"]`);
+  if(!tab) return;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.add('hidden'));
+  tab.classList.add('active');
+  document.getElementById('panel-' + name).classList.remove('hidden');
+  if(name === 'records') loadRecords();
+  if(name === 'audit') loadAudit();
+}
+
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click', ()=> activateTab(tab.dataset.tab));
+});
+
+// Deep-linking: /dashboard#unlearn, /dashboard#audit, etc. from the hero page's links
+function applyHashTab(){
+  const hash = window.location.hash.replace('#', '');
+  if(hash) activateTab(hash);
+}
+window.addEventListener('hashchange', applyHashTab);
+
+async function refreshAll(){
+  const tasks = [loadOverview(), loadRecords(), populateSelectors(), loadAudit()];
+  const results = await Promise.allSettled(tasks);
+  results.forEach(r => { if(r.status === "rejected") console.error("Panel failed to load:", r.reason); });
+}
+
+async function loadOverview(){
+  const resp = await fetch(API + "/api/overview");
+  const data = await resp.json();
+  NUM_SHARDS = data.num_shards; NUM_SLICES = data.num_slices;
+
+  document.getElementById('header-accuracy').textContent = data.accuracy.toFixed(4);
+  document.getElementById('ov-accuracy').textContent = data.accuracy.toFixed(4);
+
+  let total = 0;
+  const container = document.getElementById('shard-map-container');
+  container.innerHTML = "";
+  data.shards.forEach(shard=>{
+    total += shard.record_count;
+    const block = document.createElement('div');
+    block.className = "shard-block";
+    block.id = "shard-" + shard.shard_id;
+    block.innerHTML = `
+      <div class="shard-head">
+        <span>Shard ${shard.shard_id}</span>
+        <span class="count">${shard.record_count} records</span>
+      </div>
+      <div class="slice-row">
+        ${shard.slices.map(s => `<div class="slice-cell" id="slice-${shard.shard_id}-${s.slice_order}">S${s.slice_order}</div>`).join("")}
+      </div>`;
+    container.appendChild(block);
+  });
+  document.getElementById('ov-total').textContent = total;
+}
+
+async function loadRecords(){
+  const shardFilter = document.getElementById('records-shard-filter').value;
+  const url = shardFilter ? `${API}/api/records?shard_id=${shardFilter}` : `${API}/api/records`;
+  const resp = await fetch(url);
+  const data = await resp.json();
+  const body = document.getElementById('records-body');
+  if(data.records.length === 0){
+    body.innerHTML = `<tr><td colspan="5" class="empty">No records</td></tr>`;
+    return;
+  }
+  body.innerHTML = data.records.map(r => `
+    <tr>
+      <td>${r.record_id}</td>
+      <td>${r.shard_id}</td>
+      <td>${r.slice_id}</td>
+      <td>${r.label}</td>
+      <td>${r.is_deleted ? "yes" : "no"}</td>
+    </tr>`).join("");
+}
+
+async function populateSelectors(){
+  const shardSelects = ['records-shard-filter', 'insert-shard'];
+  const shardFilterSel = document.getElementById('records-shard-filter');
+  const insertShardSel = document.getElementById('insert-shard');
+  insertShardSel.innerHTML = "";
+  for(let i=0;i<NUM_SHARDS;i++){
+    insertShardSel.innerHTML += `<option value="${i}">Shard ${i}</option>`;
+    if(![...shardFilterSel.options].some(o=>o.value == i)){
+      shardFilterSel.innerHTML += `<option value="${i}">Shard ${i}</option>`;
+    }
+  }
+  const sliceSel = document.getElementById('insert-slice');
+  sliceSel.innerHTML = "";
+  for(let i=0;i<NUM_SLICES;i++){
+    sliceSel.innerHTML += `<option value="${i}">Slice ${i}</option>`;
+  }
+
+  const resp = await fetch(API + "/api/records");
+  const data = await resp.json();
+  const updateSel = document.getElementById('update-record');
+  const unlearnSel = document.getElementById('unlearn-record');
+  updateSel.innerHTML = data.records.map(r => `<option value="${r.record_id}">#${r.record_id} (shard ${r.shard_id}, label ${r.label})</option>`).join("");
+  unlearnSel.innerHTML = data.records.map(r => `<option value="${r.record_id}">#${r.record_id} (shard ${r.shard_id}, label ${r.label})</option>`).join("");
+}
+
+async function insertRecord(){
+  const shard_id = document.getElementById('insert-shard').value;
+  const slice_order = document.getElementById('insert-slice').value;
+  const label = document.getElementById('insert-label').value;
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = "Inserting & retraining...";
+
+  const resp = await fetch(API + "/api/insert", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({shard_id, slice_order, label})});
+  const data = await resp.json();
+  btn.disabled = false;
+  btn.textContent = "Insert & retrain affected slice";
+
+  if(data.status !== "ok"){
+    document.getElementById('insert-result-container').innerHTML = `<p class="hint">Error: ${data.message}</p>`;
+    return;
+  }
+
+  const r = data.result;
+  lastOpResult = {...r, type: "insert"};
+  const sId = r.shard_id;
+  for(let so = r.rolled_back_to_slice + 1; so < r.rolled_back_to_slice + 1 + r.retrained_slices; so++){
+    const cell = document.getElementById(`slice-${sId}-${so}`);
+    if(cell){ cell.classList.add('dissolving'); }
+  }
+  const shardBlock = document.getElementById('shard-' + sId);
+  if(shardBlock) shardBlock.classList.add('affected');
+
+  setTimeout(()=>{
+    if(shardBlock) shardBlock.classList.remove('affected');
+    renderOpResult('insert-result-container', `Inserted record <strong>#${r.record_id}</strong> into shard <strong>${r.shard_id}</strong>, slice <strong>${slice_order}</strong>. Rolled back to checkpoint after slice <strong>${r.rolled_back_to_slice}</strong>, retrained <strong>${r.retrained_slices}</strong> slice(s) — not the whole shard, not the whole dataset.`, r);
+    refreshAll();
+  }, 1200);
+}
+
+async function updateRecord(){
+  const record_id = document.getElementById('update-record').value;
+  const new_label = document.getElementById('update-label').value;
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = "Retraining affected slice...";
+
+  const resp = await fetch(API + "/api/update", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({record_id, new_label})});
+  const data = await resp.json();
+  btn.disabled = false;
+  btn.textContent = "Update & retrain affected slice";
+
+  if(data.status !== "ok"){
+    document.getElementById('update-result-container').innerHTML = `<p class="hint">Error: ${data.message}</p>`;
+    return;
+  }
+
+  const r = data.result;
+  lastOpResult = {...r, type: "update"};
+  const shardId = r.shard_id;
+  for(let so = r.rolled_back_to_slice + 1; so < r.rolled_back_to_slice + 1 + r.retrained_slices; so++){
+    const cell = document.getElementById(`slice-${shardId}-${so}`);
+    if(cell){ cell.classList.add('dissolving'); }
+  }
+  const shardBlock = document.getElementById('shard-' + shardId);
+  if(shardBlock) shardBlock.classList.add('affected');
+
+  setTimeout(()=>{
+    if(shardBlock) shardBlock.classList.remove('affected');
+    renderOpResult('update-result-container', `Record <strong>#${record_id}</strong> updated to label <strong>${new_label}</strong>. Rolled back to checkpoint after slice <strong>${r.rolled_back_to_slice}</strong>, retrained <strong>${r.retrained_slices}</strong> slice(s) in shard <strong>${r.shard_id}</strong> — not the whole shard, not the whole dataset.`, r);
+    refreshAll();
+  }, 1200);
+}
+
+async function unlearnRecord(){
+  const record_id = document.getElementById('unlearn-record').value;
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = "Rolling back...";
+
+  const resp = await fetch(API + "/api/unlearn", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({record_id})});
+  const data = await resp.json();
+  btn.disabled = false;
+  btn.textContent = "Delete & unlearn";
+
+  if(data.status !== "ok"){
+    document.getElementById('unlearn-result-container').innerHTML = `<p class="hint">Error: ${data.message}</p>`;
+    return;
+  }
+
+  const r = data.result;
+  lastOpResult = {...r, type: "delete"};
+  // animate: mark slices from rolled_back_to_slice+1 through last as "dissolving" then "retrained"
+  const shardId = r.shard_id;
+  for(let so = r.rolled_back_to_slice + 1; so < r.rolled_back_to_slice + 1 + r.retrained_slices; so++){
+    const cell = document.getElementById(`slice-${shardId}-${so}`);
+    if(cell){ cell.classList.add('dissolving'); }
+  }
+  document.getElementById('shard-' + shardId).classList.add('affected');
+
+  setTimeout(()=>{
+    document.getElementById('shard-' + shardId).classList.remove('affected');
+    renderOpResult('unlearn-result-container', `Deleted record <strong>#${r.record_id}</strong> and unlearned it: rolled back to checkpoint after slice <strong>${r.rolled_back_to_slice}</strong>, retrained <strong>${r.retrained_slices}</strong> slice(s) in shard <strong>${r.shard_id}</strong> — not the whole shard, not the whole dataset.`, r);
+    refreshAll();
+  }, 1200);
+}
+
+function renderOpResult(containerId, description, r){
+  document.getElementById(containerId).innerHTML = `
+    <div class="unlearn-result">
+      <div>${description}</div>
+      <div class="compare-grid">
+        <div class="compare-col sisa">
+          <h4>SISA (this operation)</h4>
+          <div class="compare-row"><span>Time taken</span><strong>${r.duration_seconds.toFixed(3)}s</strong></div>
+          <div class="compare-row"><span>Accuracy before</span><strong>${r.accuracy_before.toFixed(4)}</strong></div>
+          <div class="compare-row"><span>Accuracy after</span><strong>${r.accuracy_after.toFixed(4)}</strong></div>
+        </div>
+        <div class="compare-col baseline" id="baseline-col">
+          <h4>Full retrain (ground truth)</h4>
+          <p class="hint">Go to Delete &amp; Unlearn to run the baseline comparison.</p>
+        </div>
+      </div>
+      <div id="speedup-container"></div>
+    </div>`;
+}
+
+async function runBaseline(){
+  if(!lastOpResult){
+    document.getElementById('unlearn-result-container').innerHTML = `<p class="hint">Run an insert, update, or delete first so there's something to compare the baseline against.</p>`;
+    return;
+  }
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = "Retraining everything...";
+  const resp = await fetch(API + "/api/full-retrain-baseline", {method:"POST"});
+  const data = await resp.json();
+  btn.disabled = false;
+  btn.textContent = "Run full retrain baseline";
+  if(data.status !== "ok"){
+    return;
+  }
+  const r = lastOpResult;
+  const speedup = data.duration_seconds > 0 ? (data.duration_seconds / r.duration_seconds) : null;
+  const accDiff = Math.abs(data.accuracy - r.accuracy_after);
+  const baselineCol = document.getElementById('baseline-col');
+  if(baselineCol){
+    baselineCol.innerHTML = `
+      <h4>Full retrain (ground truth)</h4>
+      <div class="compare-row"><span>Time taken</span><strong>${data.duration_seconds.toFixed(3)}s</strong></div>
+      <div class="compare-row"><span>Accuracy</span><strong>${data.accuracy.toFixed(4)}</strong></div>
+      <div class="compare-row"><span>vs. SISA accuracy</span><strong>${accDiff.toFixed(4)} diff</strong></div>
+    `;
+  }
+  const speedupEl = document.getElementById('speedup-container');
+  if(speedupEl && speedup){
+    speedupEl.innerHTML = `<div class="speedup-banner">SISA's <strong>${r.type}</strong> was <strong>${speedup.toFixed(1)}×</strong> faster than a full retrain, for a ${accDiff.toFixed(4)} accuracy difference.</div>`;
+  }
+}
+
+async function loadAudit(){
+  const resp = await fetch(API + "/api/audit-log");
+  const data = await resp.json();
+  const body = document.getElementById('audit-body');
+  if(data.log.length === 0){
+    body.innerHTML = `<tr><td colspan="8" class="empty">No operations yet</td></tr>`;
+    return;
+  }
+  body.innerHTML = data.log.map(l => `
+    <tr>
+      <td><span class="op-badge op-${l.operation}">${l.operation}</span></td>
+      <td>#${l.record_id}</td>
+      <td>${l.shard_id}</td>
+      <td>${l.rolled_back_to_slice}</td>
+      <td>${l.retrained_slices}</td>
+      <td>${l.accuracy_before ? l.accuracy_before.toFixed(4) : "—"}</td>
+      <td>${l.accuracy_after ? l.accuracy_after.toFixed(4) : "—"}</td>
+      <td>${l.duration_seconds ? l.duration_seconds.toFixed(3) : "—"}</td>
+    </tr>`).join("");
+}
+</script>
+</body>
+</html>
