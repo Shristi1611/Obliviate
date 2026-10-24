@@ -1,7 +1,7 @@
 # Obliviate 
 > **A SISA-Based Machine Unlearning System for Sepsis Risk Prediction**
 
-Obliviate is a verifiable machine unlearning framework that enforces the "Right to be Forgotten" in clinical AI. Built on SISA architecture with PyTorch and TabNet on PhysioNet Sepsis ICU data, it executes fast, localized slice rollbacks during deletion requests—slashing retrain time while preserving predictive accuracy.
+Obliviate is a verifiable machine unlearning framework that enforces the "Right to be Forgotten" in clinical AI. Built on SISA architecture with PyTorch and TabNet on PhysioNet Sepsis ICU data, it executes fast, localized slice rollbacks during deletion requests slashing retrain time while preserving predictive accuracy.
 
 ---
 
