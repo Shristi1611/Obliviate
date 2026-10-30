@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Obliviate — Dashboard</title>
+<title>Obliviate: Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Questrial&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -16,11 +16,11 @@
     --glass:rgba(255,255,255,.4);
     --glass-soft:rgba(255,255,255,.22);
     --text-dim:rgba(0,0,0,.58);
-    --accent:#28644E;      /* deep muted teal — "clean / trained" state */
+    --accent:#28644E;      /* deep muted teal ("clean / trained" state) */
     --accent-dim:rgba(40,100,78,.10);
-    --danger:#7C2F42;      /* deep plum-brick — "deleted / forgotten" state */
+    --danger:#7C2F42;      /* deep plum-brick ("deleted / forgotten" state) */
     --danger-dim:rgba(124,47,66,.10);
-    --update:#8A5A17;      /* muted amber — "changed" state */
+    --update:#8A5A17;      /* muted amber ("changed" state) */
     --update-dim:rgba(138,90,23,.10);
   }
   *{box-sizing:border-box;margin:0;padding:0}
@@ -39,6 +39,8 @@
 
   /* ---------- Header ---------- */
   header{
+    position:relative;
+    overflow:hidden;
     display:flex;
     align-items:flex-start;
     justify-content:space-between;
@@ -47,6 +49,26 @@
     border-bottom:1.4px solid var(--hairline);
     flex-wrap:wrap;
   }
+  .header-figure{
+    position:absolute;
+    top:-30%;
+    right:280px;
+    height:190%;
+    width:auto;
+    aspect-ratio:1049 / 1032;
+    z-index:0;
+    pointer-events:none;
+    user-select:none;
+    opacity:.10;
+    filter:grayscale(1) brightness(1.1) contrast(.95);
+    -webkit-mask-image:linear-gradient(to right,transparent 0,#000 25%,#000 75%,transparent 100%),linear-gradient(to bottom,transparent 0,#000 25%,#000 100%);
+    mask-image:linear-gradient(to right,transparent 0,#000 25%,#000 75%,transparent 100%),linear-gradient(to bottom,transparent 0,#000 25%,#000 100%);
+    -webkit-mask-composite:source-in;
+    mask-composite:intersect;
+  }
+  .header-figure video{width:100%;height:100%;object-fit:cover;display:block}
+  header > *{position:relative; z-index:1}
+  @media (max-width:960px){.header-figure{display:none}}
   .back-link{
     font-size:13px;
     color:var(--ink);
@@ -325,6 +347,20 @@
   .hint{color:var(--text-dim); font-size:12px; margin-top:6px}
   .hint a{color:var(--danger)}
   .empty{color:var(--text-dim); font-size:13px; padding:20px 0}
+
+  /* ---------- Entrance animation (pre-hidden state; JS fades/slides these in
+     once data is loaded, see playEntranceAnimation()). If JS never removes
+     this, we still fail visible -- see the noscript rule below. ---------- */
+  #app[data-anim="pending"] header{opacity:0; translate:0 -14px}
+  #app[data-anim="pending"] .shardmap{opacity:0; translate:-14px 0}
+  #app[data-anim="pending"] .tabs{opacity:0; translate:0 -10px}
+  #app[data-anim="pending"] .panel{opacity:0; translate:0 12px}
+  @media (prefers-reduced-motion:reduce){
+    #app[data-anim="pending"] header,
+    #app[data-anim="pending"] .shardmap,
+    #app[data-anim="pending"] .tabs,
+    #app[data-anim="pending"] .panel{opacity:1; translate:0 0}
+  }
 </style>
 </head>
 <body>
@@ -332,13 +368,17 @@
 <div id="init-screen" class="init-screen">
   <h2>Obliviate</h2>
   <p>A database-backed ML system where deletion means real, verifiable forgetting.</p>
-  <p class="hint">First-time setup seeds the database and trains every shard: this can take a while. After that, restarting the server resumes instantly without retraining.</p>
+  <p class="hint">First-time setup seeds the database and trains every shard, which can take a while. After that, restarting the server resumes instantly without retraining.</p>
   <button class="action" onclick="initSystem(false)">Initialize database</button>
   <p class="hint" id="init-status"></p>
 </div>
 
 <div id="app" style="display:none;">
   <header>
+    <div class="header-figure" aria-hidden="true">
+      <video muted playsinline loop preload="none" disablepictureinpicture tabindex="-1"
+             src="https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/24f3c998-86fb-4f1d-9906-07c7fa740f8a.mp4"></video>
+    </div>
     <div>
       <a href="/" class="back-link">&larr; Obliviate</a>
       <h1>Live dashboard</h1>
@@ -346,7 +386,7 @@
     </div>
     <div class="accuracy-pill">
       <span>aggregated accuracy</span>
-      <span class="value" id="header-accuracy">—</span>
+      <span class="value" id="header-accuracy">N/A</span>
     </div>
   </header>
 
@@ -370,11 +410,11 @@
         <div class="grid-2">
           <div class="card">
             <h3>Aggregated accuracy</h3>
-            <div class="big" id="ov-accuracy">—</div>
+            <div class="big" id="ov-accuracy">N/A</div>
           </div>
           <div class="card">
             <h3>Total active records</h3>
-            <div class="big" id="ov-total">—</div>
+            <div class="big" id="ov-total">N/A</div>
           </div>
         </div>
         <p class="hint" style="margin-top:20px;">
@@ -461,15 +501,59 @@ const API = "";
 let NUM_SHARDS = 4, NUM_SLICES = 4;
 let lastOpResult = null;   // {type, shard_id, duration_seconds, accuracy_after, ...} from insert/update/delete
 
+/* ---------- entrance animation (mirrors the hero's fade/slide-in) ---------- */
+function showApp(){
+  document.getElementById('init-screen').style.display = "none";
+  const app = document.getElementById('app');
+  app.setAttribute('data-anim', 'pending'); // CSS pre-hides header/shardmap/tabs/panel
+  app.style.display = "block";
+}
+
+function playEntranceAnimation(){
+  if(window.__dashAnimated) return;
+  window.__dashAnimated = true;
+  const app = document.getElementById('app');
+  let reduced = false;
+  try{ reduced = matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){}
+  if(!('animate' in Element.prototype) || reduced){
+    app.removeAttribute('data-anim');
+    return;
+  }
+  const UI = 'cubic-bezier(.3,.7,.55,1)';
+  const tweens = [];
+  function tw(el, frames, dur, delay){
+    if(!el) return;
+    tweens.push(el.animate(frames, {duration: dur, delay: delay, easing: UI, fill: 'both'}));
+  }
+  tw(document.querySelector('header'), [{opacity:0, translate:'0 -14px'}, {opacity:1, translate:'0 0'}], 600, 0);
+  tw(document.querySelector('.shardmap'), [{opacity:0, translate:'-14px 0'}, {opacity:1, translate:'0 0'}], 600, 120);
+  tw(document.querySelector('.tabs'), [{opacity:0, translate:'0 -10px'}, {opacity:1, translate:'0 0'}], 550, 220);
+  tw(document.querySelector('.panel:not(.hidden)'), [{opacity:0, translate:'0 12px'}, {opacity:1, translate:'0 0'}], 550, 320);
+  if(!tweens.length){ app.removeAttribute('data-anim'); return; }
+  Promise.all(tweens.map(t => t.finished.catch(()=>{}))).then(() => app.removeAttribute('data-anim'));
+}
+
+function playHeaderFigure(){
+  const v = document.querySelector('.header-figure video');
+  if(!v) return;
+  let reduced = false;
+  try{ reduced = matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){}
+  if(reduced) return;
+  v.preload = 'auto';
+  const p = v.play();
+  if(p && p.catch) p.catch(()=>{}); // autoplay can be silently blocked; the watermark is decorative, so just skip it
+}
+
 async function checkStatusOnLoad(){
   try{
     const resp = await fetch(API + "/api/status");
     const data = await resp.json();
     if(data.ready){
-      document.getElementById('init-screen').style.display = "none";
-      document.getElementById('app').style.display = "block";
-      try{ await refreshAll(); }catch(e){ console.error("refreshAll failed:", e); }
-      applyHashTab();
+      showApp();
+      applyHashTab({skipRefresh: true}); // refreshAll() below loads this tab's data anyway
+      playEntranceAnimation();
+      playHeaderFigure();
+      refreshAll().catch(e => console.error("refreshAll failed:", e));
     }
   }catch(e){ /* backend not reachable yet; leave init screen showing */ }
 }
@@ -482,25 +566,28 @@ async function initSystem(force){
   const resp = await fetch(API + "/api/init", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({force: !!force})});
   const data = await resp.json();
   if(data.status === "ok"){
-    document.getElementById('init-screen').style.display = "none";
-    document.getElementById('app').style.display = "block";
-    try{ await refreshAll(); }catch(e){ console.error("refreshAll failed:", e); }
-    applyHashTab();
+    showApp();
+    applyHashTab({skipRefresh: true}); // refreshAll() below loads this tab's data anyway
+    playEntranceAnimation();
+    playHeaderFigure();
+    refreshAll().catch(e => console.error("refreshAll failed:", e));
     if(data.resumed){
-      console.log("Resumed from existing trained models — no retraining needed.");
+      console.log("Resumed from existing trained models. No retraining needed.");
     }
   } else {
     document.getElementById('init-status').textContent = "Error: " + data.message;
   }
 }
 
-function activateTab(name){
+function activateTab(name, opts){
+  const skipRefresh = opts && opts.skipRefresh;
   const tab = document.querySelector(`.tab[data-tab="${name}"]`);
   if(!tab) return;
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(p=>p.classList.add('hidden'));
   tab.classList.add('active');
   document.getElementById('panel-' + name).classList.remove('hidden');
+  if(skipRefresh) return;
   if(name === 'records') loadRecords();
   if(name === 'audit') loadAudit();
 }
@@ -510,16 +597,37 @@ document.querySelectorAll('.tab').forEach(tab=>{
 });
 
 // Deep-linking: /dashboard#unlearn, /dashboard#audit, etc. from the hero page's links
-function applyHashTab(){
+function applyHashTab(opts){
   const hash = window.location.hash.replace('#', '');
-  if(hash) activateTab(hash);
+  if(hash) activateTab(hash, opts);
 }
-window.addEventListener('hashchange', applyHashTab);
+window.addEventListener('hashchange', () => applyHashTab());
 
 async function refreshAll(){
-  const tasks = [loadOverview(), loadRecords(), populateSelectors(), loadAudit()];
-  const results = await Promise.allSettled(tasks);
-  results.forEach(r => { if(r.status === "rejected") console.error("Panel failed to load:", r.reason); });
+  // Fetch the records list ONCE and share it with both loadRecords() and
+  // populateSelectors() (they used to each fetch /api/records separately,
+  // doubling that request every single page load for no reason). Loaded
+  // sequentially rather than in parallel -- on localhost the latency
+  // difference is negligible, but bursting several simultaneous sockets
+  // at once is exactly what can exhaust the OS's socket buffer on some
+  // Windows setups (WinError 10055). Each step is individually try/caught
+  // so one failing call still can't block the rest or block hash-tab
+  // routing afterward.
+  let records = null;
+  try{
+    const resp = await fetch(API + "/api/records");
+    records = (await resp.json()).records;
+  }catch(e){ console.error("Failed to fetch records:", e); }
+
+  const steps = [
+    ["overview", () => loadOverview()],
+    ["records table", () => loadRecords(records)],
+    ["selectors", () => populateSelectors(records)],
+    ["audit log", () => loadAudit()],
+  ];
+  for(const [name, fn] of steps){
+    try{ await fn(); }catch(e){ console.error(`Panel "${name}" failed to load:`, e); }
+  }
 }
 
 async function loadOverview(){
@@ -551,17 +659,22 @@ async function loadOverview(){
   document.getElementById('ov-total').textContent = total;
 }
 
-async function loadRecords(){
+async function loadRecords(preFetched){
   const shardFilter = document.getElementById('records-shard-filter').value;
-  const url = shardFilter ? `${API}/api/records?shard_id=${shardFilter}` : `${API}/api/records`;
-  const resp = await fetch(url);
-  const data = await resp.json();
+  let records;
+  if(preFetched && !shardFilter){
+    records = preFetched;
+  } else {
+    const url = shardFilter ? `${API}/api/records?shard_id=${shardFilter}` : `${API}/api/records`;
+    const resp = await fetch(url);
+    records = (await resp.json()).records;
+  }
   const body = document.getElementById('records-body');
-  if(data.records.length === 0){
+  if(records.length === 0){
     body.innerHTML = `<tr><td colspan="5" class="empty">No records</td></tr>`;
     return;
   }
-  body.innerHTML = data.records.map(r => `
+  body.innerHTML = records.map(r => `
     <tr>
       <td>${r.record_id}</td>
       <td>${r.shard_id}</td>
@@ -571,7 +684,7 @@ async function loadRecords(){
     </tr>`).join("");
 }
 
-async function populateSelectors(){
+async function populateSelectors(preFetched){
   const shardSelects = ['records-shard-filter', 'insert-shard'];
   const shardFilterSel = document.getElementById('records-shard-filter');
   const insertShardSel = document.getElementById('insert-shard');
@@ -588,12 +701,11 @@ async function populateSelectors(){
     sliceSel.innerHTML += `<option value="${i}">Slice ${i}</option>`;
   }
 
-  const resp = await fetch(API + "/api/records");
-  const data = await resp.json();
+  const records = preFetched || (await (await fetch(API + "/api/records")).json()).records;
   const updateSel = document.getElementById('update-record');
   const unlearnSel = document.getElementById('unlearn-record');
-  updateSel.innerHTML = data.records.map(r => `<option value="${r.record_id}">#${r.record_id} (shard ${r.shard_id}, label ${r.label})</option>`).join("");
-  unlearnSel.innerHTML = data.records.map(r => `<option value="${r.record_id}">#${r.record_id} (shard ${r.shard_id}, label ${r.label})</option>`).join("");
+  updateSel.innerHTML = records.map(r => `<option value="${r.record_id}">#${r.record_id} (shard ${r.shard_id}, label ${r.label})</option>`).join("");
+  unlearnSel.innerHTML = records.map(r => `<option value="${r.record_id}">#${r.record_id} (shard ${r.shard_id}, label ${r.label})</option>`).join("");
 }
 
 async function insertRecord(){
@@ -626,7 +738,7 @@ async function insertRecord(){
 
   setTimeout(()=>{
     if(shardBlock) shardBlock.classList.remove('affected');
-    renderOpResult('insert-result-container', `Inserted record <strong>#${r.record_id}</strong> into shard <strong>${r.shard_id}</strong>, slice <strong>${slice_order}</strong>. Rolled back to checkpoint after slice <strong>${r.rolled_back_to_slice}</strong>, retrained <strong>${r.retrained_slices}</strong> slice(s) — not the whole shard, not the whole dataset.`, r);
+    renderOpResult('insert-result-container', `Inserted record <strong>#${r.record_id}</strong> into shard <strong>${r.shard_id}</strong>, slice <strong>${slice_order}</strong>. Rolled back to checkpoint after slice <strong>${r.rolled_back_to_slice}</strong>, retrained <strong>${r.retrained_slices}</strong> slice(s). Not the whole shard, not the whole dataset.`, r);
     refreshAll();
   }, 1200);
 }
@@ -660,7 +772,7 @@ async function updateRecord(){
 
   setTimeout(()=>{
     if(shardBlock) shardBlock.classList.remove('affected');
-    renderOpResult('update-result-container', `Record <strong>#${record_id}</strong> updated to label <strong>${new_label}</strong>. Rolled back to checkpoint after slice <strong>${r.rolled_back_to_slice}</strong>, retrained <strong>${r.retrained_slices}</strong> slice(s) in shard <strong>${r.shard_id}</strong> — not the whole shard, not the whole dataset.`, r);
+    renderOpResult('update-result-container', `Record <strong>#${record_id}</strong> updated to label <strong>${new_label}</strong>. Rolled back to checkpoint after slice <strong>${r.rolled_back_to_slice}</strong>, retrained <strong>${r.retrained_slices}</strong> slice(s) in shard <strong>${r.shard_id}</strong>. Not the whole shard, not the whole dataset.`, r);
     refreshAll();
   }, 1200);
 }
@@ -693,7 +805,7 @@ async function unlearnRecord(){
 
   setTimeout(()=>{
     document.getElementById('shard-' + shardId).classList.remove('affected');
-    renderOpResult('unlearn-result-container', `Deleted record <strong>#${r.record_id}</strong> and unlearned it: rolled back to checkpoint after slice <strong>${r.rolled_back_to_slice}</strong>, retrained <strong>${r.retrained_slices}</strong> slice(s) in shard <strong>${r.shard_id}</strong> — not the whole shard, not the whole dataset.`, r);
+    renderOpResult('unlearn-result-container', `Deleted record <strong>#${r.record_id}</strong> and unlearned it: rolled back to checkpoint after slice <strong>${r.rolled_back_to_slice}</strong>, retrained <strong>${r.retrained_slices}</strong> slice(s) in shard <strong>${r.shard_id}</strong>. Not the whole shard, not the whole dataset.`, r);
     refreshAll();
   }, 1200);
 }
@@ -766,9 +878,9 @@ async function loadAudit(){
       <td>${l.shard_id}</td>
       <td>${l.rolled_back_to_slice}</td>
       <td>${l.retrained_slices}</td>
-      <td>${l.accuracy_before ? l.accuracy_before.toFixed(4) : "—"}</td>
-      <td>${l.accuracy_after ? l.accuracy_after.toFixed(4) : "—"}</td>
-      <td>${l.duration_seconds ? l.duration_seconds.toFixed(3) : "—"}</td>
+      <td>${l.accuracy_before ? l.accuracy_before.toFixed(4) : "N/A"}</td>
+      <td>${l.accuracy_after ? l.accuracy_after.toFixed(4) : "N/A"}</td>
+      <td>${l.duration_seconds ? l.duration_seconds.toFixed(3) : "N/A"}</td>
     </tr>`).join("");
 }
 </script>
